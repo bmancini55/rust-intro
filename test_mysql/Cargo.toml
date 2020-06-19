@@ -1,0 +1,10 @@
+[package]
+edition = "2018"
+name = "test_mysql"
+version = "0.1.0"
+authors = ["Brian Mancini <bmancini@gmail.com>"]
+
+[dependencies]
+mysql = "18.2.0"
+toml = "0.5.6"
+
