@@ -3,6 +3,7 @@ mod enums;
 mod greet;
 mod next_id_1;
 mod next_id_2;
+mod option;
 mod reverse;
 
 fn main() {
@@ -12,4 +13,5 @@ fn main() {
     reverse::run();
     enums::run();
     casting::run();
+    option::run();
 }
