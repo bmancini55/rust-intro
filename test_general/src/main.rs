@@ -1,4 +1,5 @@
 mod casting;
+mod channels;
 mod enums;
 mod greet;
 mod next_id_1;
@@ -14,4 +15,7 @@ fn main() {
     enums::run();
     casting::run();
     option::run();
+
+    println!("channels\n");
+    channels::run();
 }
