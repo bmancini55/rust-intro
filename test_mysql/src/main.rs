@@ -3,6 +3,9 @@ use mysql::*;
 use std::fmt;
 use std::fs::File;
 use std::io::prelude::*;
+use std::sync::mpsc::sync_channel;
+use std::sync::mpsc::SyncSender;
+use std::thread;
 use toml::Value;
 
 #[derive(Debug)] // enables the ability to use
@@ -57,10 +60,40 @@ fn main() -> Result<()> {
 
     // construct a pool
     let pool = Pool::new(url)?;
-    let mut conn = pool.get_conn()?;
 
-    // perform the selection
-    let selected_candles = conn.query_map(
+    // example 1: buffer all result to memory
+    // obtain a connection from the pool, select the results from the database
+    // and into memory and then does some stuff with the result
+    let selected_candles = load_candles_direct(&pool)?;
+    println!("records read: {0}", selected_candles.len());
+    println!("debug:   {:?}", selected_candles[0]); // print via debug
+    println!("display: {0}", selected_candles[0]); // print via display
+
+    // example 2: use a channel to stream results
+    // slightly more complex example where we spawn a thread to produce results
+    // from the database that can be consumed by the main thread using the
+    // receiving iterator
+    let (sender, receiver) = sync_channel(0);
+    let child = thread::spawn({
+        let pool = pool.clone();
+        move || {
+            println!("producer thread has started");
+            let result = stream_candles(&pool, &sender);
+            println!("producer thread has ended");
+            result
+        }
+    });
+    // consume records through a blocking iterator
+    receiver.iter().for_each(|candle| println!("{}", candle));
+    // capture any errors that happened in the reading thread
+    child.join().unwrap()?;
+
+    Ok(())
+}
+
+fn load_candles_direct(pool: &mysql::Pool) -> Result<Vec<Candle>> {
+    let mut conn = pool.get_conn()?;
+    conn.query_map(
         "select * from candle.binance_btc_usdt",
         |(period, unix, high, low, open, close, volume, quote_volume)| crate::Candle {
             period,
@@ -72,10 +105,28 @@ fn main() -> Result<()> {
             volume,
             quote_volume,
         },
-    )?;
+    )
+}
 
-    println!("records read: {0}", selected_candles.len());
-    println!("debug:   {:?}", selected_candles[0]); // print via debug
-    println!("display: {0}", selected_candles[0]); // print via display
-    return Ok(());
+fn stream_candles(pool: &mysql::Pool, sender: &SyncSender<Candle>) -> Result<()> {
+    let mut conn = pool.get_conn()?;
+    let mut result = conn.query_iter("select * from candle.binance_btc_usdt")?;
+
+    while let Some(result_set) = result.next_set() {
+        for row in result_set.unwrap() {
+            let row = row?;
+            let candle = Candle {
+                period: row.get(0).unwrap_or_default(),
+                unix: row.get(1).unwrap_or_default(),
+                high: row.get(2).unwrap_or_default(),
+                low: row.get(3).unwrap_or_default(),
+                open: row.get(4).unwrap_or_default(),
+                close: row.get(5).unwrap_or_default(),
+                volume: row.get(6).unwrap_or_default(),
+                quote_volume: row.get(7).unwrap_or_default(),
+            };
+            sender.send(candle).unwrap();
+        }
+    }
+    Ok(())
 }
