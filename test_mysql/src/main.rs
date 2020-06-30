@@ -1,3 +1,5 @@
+#![feature(generators, generator_trait)]
+
 use mysql::prelude::*;
 use mysql::*;
 use std::fmt;
@@ -112,21 +114,23 @@ fn stream_candles(pool: &mysql::Pool, sender: &SyncSender<Candle>) -> Result<()>
     let mut conn = pool.get_conn()?;
     let mut result = conn.query_iter("select * from candle.binance_btc_usdt")?;
 
-    while let Some(result_set) = result.next_set() {
-        for row in result_set.unwrap() {
-            let row = row?;
-            let candle = Candle {
-                period: row.get(0).unwrap_or_default(),
-                unix: row.get(1).unwrap_or_default(),
-                high: row.get(2).unwrap_or_default(),
-                low: row.get(3).unwrap_or_default(),
-                open: row.get(4).unwrap_or_default(),
-                close: row.get(5).unwrap_or_default(),
-                volume: row.get(6).unwrap_or_default(),
-                quote_volume: row.get(7).unwrap_or_default(),
-            };
-            sender.send(candle).unwrap();
-        }
+    let result_set = result.next_set();
+    for row in result_set.unwrap().unwrap() {
+        let candle = parse_candle(&row?);
+        sender.send(candle).unwrap();
     }
     Ok(())
+}
+
+fn parse_candle(row: &Row) -> Candle {
+    Candle {
+        period: row.get(0).unwrap_or_default(),
+        unix: row.get(1).unwrap_or_default(),
+        high: row.get(2).unwrap_or_default(),
+        low: row.get(3).unwrap_or_default(),
+        open: row.get(4).unwrap_or_default(),
+        close: row.get(5).unwrap_or_default(),
+        volume: row.get(6).unwrap_or_default(),
+        quote_volume: row.get(7).unwrap_or_default(),
+    }
 }
