@@ -63,7 +63,7 @@ fn main() -> Result<()> {
     // construct a pool
     let pool = Pool::new(url)?;
 
-    // example 1: buffer all result to memory
+    // Technique 1: buffer all result to memory
     // obtain a connection from the pool, select the results from the database
     // and into memory and then does some stuff with the result
     let selected_candles = load_candles_direct(&pool)?;
@@ -71,7 +71,7 @@ fn main() -> Result<()> {
     println!("debug:   {:?}", selected_candles[0]); // print via debug
     println!("display: {0}", selected_candles[0]); // print via display
 
-    // example 2: use a channel to stream results
+    // Technique #2: use a channel to stream results
     // slightly more complex example where we spawn a thread to produce results
     // from the database that can be consumed by the main thread using the
     // receiving iterator
@@ -89,6 +89,43 @@ fn main() -> Result<()> {
     receiver.iter().for_each(|candle| println!("{}", candle));
     // capture any errors that happened in the reading thread
     child.join().unwrap()?;
+
+    // Technique #3: We will bubble up a candle resultset to the calling
+    // function and iterate the rows in the main area. This technique allows us
+    // to get around the reference that out of scope value for the connection
+    let mut conn = get_conn(&pool);
+    let mut result = load_candle_resultset(&mut conn);
+    let result_set = result.next_set().unwrap()?;
+    let mut i = 0;
+    for row in result_set {
+        let _candle = parse_candle(&row?);
+        i += 1;
+    }
+    println!("load directly {} candles", i);
+
+    // Technique #4: We will bubble up a candle resultset to the calling
+    // function and iterate the rows in a separate function.
+    let mut conn = get_conn(&pool);
+    let mut result = load_candle_resultset(&mut conn);
+    let result_set = result.next_set().unwrap();
+    let candles = process_result_set(result_set)?;
+    println!("load directly {} candles", candles.len());
+
+    // Technique #5: We will use continuation passing style to pass a function
+    // that will print some stuff by calling our local function here. This code
+    // can also closure scope some values and could enable us to stream. If it
+    // uses Fn, then it cannot modify the closure scoped variable. If it uses
+    // FnMut, then it can modify the closure scoped value.
+    println!("\n\n Technique #5");
+    thread::sleep(std::time::Duration::from_secs(1));
+    let mut i = 0; // this value is in closure scope
+    stream_candle_cont(&pool, &mut |candle| {
+        if candle.period == 86400 {
+            println!("{}", candle);
+        }
+        i += 1; // this is closure scoped
+    })?;
+    println!("looked at {} candles", i);
 
     Ok(())
 }
@@ -133,4 +170,38 @@ fn parse_candle(row: &Row) -> Candle {
         volume: row.get(6).unwrap_or_default(),
         quote_volume: row.get(7).unwrap_or_default(),
     }
+}
+
+fn get_conn(pool: &Pool) -> PooledConn {
+    pool.get_conn().unwrap()
+}
+
+fn load_candle_resultset(conn: &mut mysql::PooledConn) -> QueryResult<Text> {
+    conn.query_iter("select * from candle.binance_btc_usdt")
+        .unwrap()
+}
+
+fn process_result_set(result_set: Result<ResultSet<Text>>) -> Result<Vec<Candle>> {
+    let mut vec = Vec::<Candle>::new();
+    for row in result_set.unwrap() {
+        vec.push(parse_candle(&row?));
+    }
+    Ok(vec)
+}
+
+// Could also use the method signature:
+// fn stream_candle_cont(pool: &mysql::Pool, on_row: &mut dyn FnMut(Candle)) -> Result<()> {
+fn stream_candle_cont<F>(pool: &mysql::Pool, on_row: &mut F) -> Result<()>
+where
+    F: FnMut(Candle),
+{
+    let mut conn = pool.get_conn()?;
+    let mut result = conn.query_iter("select * from candle.binance_btc_usdt")?;
+
+    let result_set = result.next_set();
+    for row in result_set.unwrap().unwrap() {
+        let candle = parse_candle(&row?);
+        on_row(candle);
+    }
+    Ok(())
 }
