@@ -6,6 +6,7 @@ mod next_id_1;
 mod next_id_2;
 mod option;
 mod reverse;
+mod vectors;
 
 fn main() {
     greet::run();
@@ -15,6 +16,7 @@ fn main() {
     enums::run();
     casting::run();
     option::run();
+    vectors::run();
 
     println!("channels\n");
     channels::run();
