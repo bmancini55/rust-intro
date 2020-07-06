@@ -1,5 +1,5 @@
 [package]
-name = "chapter_8_2_strings"
+name = "ch08-02-strings"
 version = "0.1.0"
 authors = ["Brian Mancini <bmancini@gmail.com>"]
 edition = "2018"
