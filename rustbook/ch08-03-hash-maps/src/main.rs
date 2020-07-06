@@ -84,4 +84,57 @@ fn main() {
         *count += 1;
     }
     println!("{:?}", map);
+
+    // Exercise, calculate the mean from a list of numbers
+    let mean = calc_mean(&vec![1, 2, 3, 4]);
+    println!("mean: {}", mean);
+
+    // Exercise, calculate the median from a list after sorting the list
+    println!("median: {}", calc_median(&vec![]));
+    println!("median: {}", calc_median(&vec![1]));
+    println!("median: {}", calc_median(&vec![2, 1]));
+    println!("median: {}", calc_median(&vec![3, 2, 1]));
+    println!("median: {}", calc_median(&vec![4, 3, 2, 1]));
+
+    // Exercise: calculate the mode from a list of numbers
+    let mode = calc_mode(&vec![1, 1, 4, 6, 4, 2, 4, 2, 1, 3, 5, 6]);
+    println!("mode: {}", mode);
+}
+
+fn calc_sum(nums: &Vec<i32>) -> f64 {
+    nums.iter().sum::<i32>() as f64
+}
+
+fn calc_mean(nums: &Vec<i32>) -> f64 {
+    calc_sum(nums) / nums.len() as f64
+}
+
+fn calc_median(nums: &Vec<i32>) -> f64 {
+    let mut nums = nums.clone();
+    nums.sort();
+    let len = nums.len();
+    if len == 0 {
+        return 0.0;
+    } else if len % 2 == 1 {
+        nums[nums.len() / 2] as f64
+    } else {
+        (nums[len / 2 - 1] + nums[len / 2]) as f64 / 2.0
+    }
+}
+
+fn calc_mode(nums: &Vec<i32>) -> i32 {
+    let mut map = HashMap::new();
+    for num in nums.iter() {
+        let count = map.entry(*num).or_insert(0);
+        *count += 1;
+    }
+    let mut max_key = 0;
+    let mut max_val = 0;
+    for (key, val) in &map {
+        if *val > max_val {
+            max_val = *val;
+            max_key = *key;
+        }
+    }
+    max_key
 }
