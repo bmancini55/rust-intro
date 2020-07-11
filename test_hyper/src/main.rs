@@ -1,5 +1,6 @@
+use hyper::body::Bytes;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Request, Response, Server};
+use hyper::{Body, Method, Request, Response, Server, StatusCode};
 use std::convert::Infallible;
 use std::net::SocketAddr;
 
@@ -9,10 +10,10 @@ async fn main() {
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
 
     // A `Service` is needed for every connection, so this
-    // creates one from our `hello_world` function.
+    // creates one from our `handle_conn` function.
     let make_svc = make_service_fn(|_conn| async {
         // service_fn converts our function into a `Service`
-        Ok::<_, Infallible>(service_fn(hello_world))
+        Ok::<_, Infallible>(service_fn(handle_request))
     });
 
     let server = Server::bind(&addr).serve(make_svc);
@@ -23,6 +24,41 @@ async fn main() {
     }
 }
 
+async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    match (req.method(), req.uri().path()) {
+        // index
+        (&Method::GET, "/") => hello_world(req).await,
+
+        // inside that match from before
+        (&Method::GET, "/echo") => handle_echo(req).await,
+
+        // simple async method
+        (&Method::GET, "/async") => run_async(req).await,
+
+        // 404
+        _ => {
+            let mut not_found = Response::default();
+            *not_found.status_mut() = StatusCode::NOT_FOUND;
+            *not_found.body_mut() = Body::from("Not Found");
+            Ok(not_found)
+        }
+    }
+}
+
 async fn hello_world(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
     Ok(Response::new("Hello, World".into()))
+}
+
+async fn handle_echo(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    Ok(Response::new(req.into_body()))
+}
+
+async fn run_async(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    let (channel, body) = Body::channel();
+    let mut channel = channel;
+    channel
+        .send_data(Bytes::from(&b"Hello world"[..]))
+        .await
+        .unwrap();
+    Ok(Response::new(body))
 }
