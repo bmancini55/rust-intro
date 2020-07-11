@@ -1,6 +1,8 @@
 use hyper::body::Bytes;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use std::convert::Infallible;
 use std::net::SocketAddr;
 
@@ -25,6 +27,8 @@ async fn main() {
 }
 
 async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible> {
+    middleware_log(&req).await;
+
     match (req.method(), req.uri().path()) {
         // index
         (&Method::GET, "/") => hello_world(req).await,
@@ -43,6 +47,21 @@ async fn handle_request(req: Request<Body>) -> Result<Response<Body>, Infallible
             Ok(not_found)
         }
     }
+}
+
+async fn middleware_log(req: &Request<Body>) {
+    let start = SystemTime::now();
+    let since_the_epoch = start
+        .duration_since(UNIX_EPOCH)
+        .expect("Time went backwards");
+    let method = req.method();
+    let path_and_query = req.uri().path_and_query().unwrap();
+    println!(
+        "{} {}: {}",
+        since_the_epoch.as_millis(),
+        method,
+        path_and_query
+    )
 }
 
 async fn hello_world(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
