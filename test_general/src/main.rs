@@ -2,6 +2,7 @@ mod casting;
 mod channels;
 mod enums;
 mod greet;
+mod largest;
 mod next_id_1;
 mod next_id_2;
 mod option;
@@ -17,6 +18,7 @@ fn main() {
     casting::run();
     option::run();
     vectors::run();
+    largest::run();
 
     println!("channels\n");
     channels::run();
