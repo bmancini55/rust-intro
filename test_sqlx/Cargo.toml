@@ -9,3 +9,4 @@ edition = "2018"
 [dependencies]
 tokio = { version = "0.2", features = ["full"] }
 sqlx = { version = "0.3", default-features = false, features = [ "runtime-tokio", "macros", "mysql" ] }
+futures = "0.3"
