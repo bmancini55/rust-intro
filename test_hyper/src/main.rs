@@ -73,11 +73,17 @@ async fn handle_echo(req: Request<Body>) -> Result<Response<Body>, Infallible> {
 }
 
 async fn run_async(_req: Request<Body>) -> Result<Response<Body>, Infallible> {
-    let (channel, body) = Body::channel();
-    let mut channel = channel;
-    channel
-        .send_data(Bytes::from(&b"Hello world"[..]))
-        .await
-        .unwrap();
+    let (mut channel, body) = Body::channel();
+
+    // if we don't spawn a task then the sender will block after the
+    // first message is sent!
+    tokio::spawn(async move {
+        for _ in 1..10 {
+            channel
+                .send_data(Bytes::from(&b"Hello world\n"[..]))
+                .await
+                .unwrap();
+        }
+    });
     Ok(Response::new(body))
 }
