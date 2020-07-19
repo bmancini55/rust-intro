@@ -1,4 +1,3 @@
-use futures::AsyncWriteExt;
 use futures::StreamExt;
 use sqlx::mysql::*;
 use sqlx::prelude::*;
@@ -60,6 +59,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let string: String = format!("wrote {}\n", candle?.unix);
         file.write(string.as_bytes()).await?;
     }
+
+    // test moving to a new work task where we clone the pool for use
+    // by the worker thread
+    let pool2 = pool.clone();
+    let handle = tokio::spawn(async move {
+        let mut stream =
+            sqlx::query_as::<_, Candle>("select unix from candle.binance_btc_usdt").fetch(&pool2);
+        // We need to use futures::StreamExt to use the `next` method again
+        while let Some(candle) = stream.next().await {
+            println!("worker {}", candle.unwrap().unix);
+        }
+    });
+    handle.await?;
 
     Ok(())
 }
