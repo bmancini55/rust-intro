@@ -10,6 +10,10 @@ fn main() {
         process::exit(1);
     });
 
+    run(config);
+}
+
+fn run(config: Config) {
     println!("Search for {}", config.query);
     println!("In file {}", config.filename);
 
