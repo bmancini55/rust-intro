@@ -30,6 +30,8 @@ fn main() {
     hello(&m);
 
     // If we didn't have deref coercion we would have to do this...
+    // (*m) derefences the MyBox<String> into a String. We then make
+    // a string slice using & and [..]
     hello(&(*m)[..]);
 }
 
